@@ -12,7 +12,7 @@ app.use(express.json());
 app.post("/api/info", (req, res) => {
     const { url } = req.body;
 
-    const ytdlp = spawn("yt-dlp.exe", ["-j", url]);
+    const ytdlp = spawn("yt-dlp", ["-j", url]);
 
     let data = "";
 
@@ -66,7 +66,7 @@ app.post("/api/download", (req, res) => {
         ];
     }
 
-    const ytdlp = spawn("yt-dlp.exe", args);
+    const ytdlp = spawn("yt-dlp", args);
 
     ytdlp.on("close", (code) => {
         if (code !== 0) {
@@ -93,4 +93,5 @@ app.post("/api/download", (req, res) => {
     });
 });
 
-app.listen(5000, () => console.log("Server running on port 5000"));
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
