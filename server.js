@@ -1,98 +1,45 @@
 const express = require("express");
 const cors = require("cors");
-const path = require("path");
-const fs = require("fs");
-const youtubedl = require("youtube-dl-exec");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-/* STEP A: GET VIDEO INFO */
+// STEP 1: GET INFO
 app.post("/api/info", async (req, res) => {
-    const { url } = req.body;
-    try {
-        const output = await youtubedl(url, {
-            dumpSingleJson: true,
-            noCheckCertificates: true,
-            noWarnings: true,
-            preferFreeFormats: true
-        });
-        
-        console.log("OUTPUT:", output);
-        
-        let info;
-        try {
-            info = typeof output === "string" ? JSON.parse(output) : output;
-        } catch (e) {
-            console.error("Parse error:", output);
-            return res.status(500).send("Failed to parse video info");
-        }
-        
-        if (!info || !info.title) {
-            return res.status(500).send("Invalid video data");
-        }
-        
-        res.json({
-            title: info.title,
-            thumbnail: info.thumbnail
-        });
-    } catch (err) {
-        console.error("ERROR:", err);
-        res.status(500).send(err.message || "Error fetching info");
-    }
+  const { url } = req.body;
+
+  try {
+    const response = await fetch(`https://yt-api.p.rapidapi.com/dl?id=${url.split("v=")[1]}`, {
+      headers: {
+        "X-RapidAPI-Key": "demo", // free demo key
+        "X-RapidAPI-Host": "yt-api.p.rapidapi.com"
+      }
+    });
+
+    const data = await response.json();
+
+    res.json({
+      title: data.title,
+      thumbnail: data.thumbnail[0].url
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error fetching info");
+  }
 });
 
-/* STEP B: DOWNLOAD */
+// STEP 2: DOWNLOAD (direct link return)
 app.post("/api/download", async (req, res) => {
-    const { url, type } = req.body;
-    const unique = Date.now();
-    
-    let options = {};
-    let outputFilename = "";
+  const { url } = req.body;
 
-    if (type === "mp3") {
-        outputFilename = `audio_${unique}.mp3`;
-        options = {
-            extractAudio: true,
-            audioFormat: "mp3",
-            audioQuality: "192K",
-            output: outputFilename
-        };
-    } else if (type === "mp4") {
-        outputFilename = `video_${unique}.mp4`;
-        options = {
-            format: "best[ext=mp4]",
-            output: outputFilename
-        };
-    } else if (type === "video-only") {
-        outputFilename = `video_only_${unique}.mp4`;
-        options = {
-            format: "bv*",
-            mergeOutputFormat: "mp4",
-            output: outputFilename
-        };
-    }
+  const videoId = url.split("v=")[1];
 
-    try {
-        await youtubedl(url, options);
-        
-        const filePath = path.join(__dirname, outputFilename);
-        
-        if (fs.existsSync(filePath)) {
-            res.download(filePath, outputFilename, (err) => {
-                if (!err) {
-                    fs.unlinkSync(filePath); // delete after download
-                }
-            });
-        } else {
-            res.status(500).send("Download failed: File not found");
-        }
-    } catch (err) {
-        console.error("ERROR:", err);
-        res.status(500).send(err.message || "Download failed");
-    }
+  res.json({
+    downloadUrl: `https://yt-api.p.rapidapi.com/dl?id=${videoId}`
+  });
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log("Server running"));
