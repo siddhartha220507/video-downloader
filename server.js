@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
-const youtubedl = require("youtube-dl-exec");
+const youtubedl = require("youtube-dl-exec").raw;
 
 const app = express();
 app.use(cors());
@@ -24,8 +24,8 @@ app.post("/api/info", async (req, res) => {
             thumbnail: info.thumbnail
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).send("Error fetching info");
+        console.error("ERROR:", err);
+        res.status(500).send(err.message || "Error fetching info");
     }
 });
 
@@ -75,8 +75,8 @@ app.post("/api/download", async (req, res) => {
             res.status(500).send("Download failed: File not found");
         }
     } catch (err) {
-        console.error(err);
-        res.status(500).send("Download failed");
+        console.error("ERROR:", err);
+        res.status(500).send(err.message || "Download failed");
     }
 });
 
