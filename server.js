@@ -12,12 +12,26 @@ app.use(express.json());
 app.post("/api/info", async (req, res) => {
     const { url } = req.body;
     try {
-        const info = await youtubedl(url, {
+        const output = await youtubedl(url, {
             dumpSingleJson: true,
             noCheckCertificates: true,
             noWarnings: true,
             preferFreeFormats: true
         });
+        
+        console.log("OUTPUT:", output);
+        
+        let info;
+        try {
+            info = typeof output === "string" ? JSON.parse(output) : output;
+        } catch (e) {
+            console.error("Parse error:", output);
+            return res.status(500).send("Failed to parse video info");
+        }
+        
+        if (!info || !info.title) {
+            return res.status(500).send("Invalid video data");
+        }
         
         res.json({
             title: info.title,
