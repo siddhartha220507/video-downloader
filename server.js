@@ -29,7 +29,7 @@ app.post("/api/info", async (req, res) => {
   try {
     const response = await fetch(`https://yt-api.p.rapidapi.com/dl?id=${videoId}`, {
       headers: {
-        "X-RapidAPI-Key": "demo",
+        "X-RapidAPI-Key": "6f0a2c61d5msh8b5b913e276ad91p1bc69djsn6b90126b8ef8",
         "X-RapidAPI-Host": "yt-api.p.rapidapi.com"
       }
     });
