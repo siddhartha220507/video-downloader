@@ -9,10 +9,27 @@ app.use(express.json());
 app.post("/api/info", async (req, res) => {
   const { url } = req.body;
 
+  const getVideoId = (url) => {
+    try {
+      if (url.includes("youtu.be")) {
+        return url.split("youtu.be/")[1];
+      }
+      return url.split("v=")[1];
+    } catch {
+      return null;
+    }
+  };
+
+  const videoId = getVideoId(url);
+
+  if (!videoId) {
+    return res.status(400).send("Invalid URL");
+  }
+
   try {
-    const response = await fetch(`https://yt-api.p.rapidapi.com/dl?id=${url.split("v=")[1]}`, {
+    const response = await fetch(`https://yt-api.p.rapidapi.com/dl?id=${videoId}`, {
       headers: {
-        "X-RapidAPI-Key": "demo", // free demo key
+        "X-RapidAPI-Key": "demo",
         "X-RapidAPI-Host": "yt-api.p.rapidapi.com"
       }
     });
@@ -20,8 +37,8 @@ app.post("/api/info", async (req, res) => {
     const data = await response.json();
 
     res.json({
-      title: data.title,
-      thumbnail: data.thumbnail[0].url
+      title: data.title || "No title",
+      thumbnail: data.thumbnail?.[0]?.url || "https://via.placeholder.com/300"
     });
 
   } catch (err) {
@@ -34,7 +51,22 @@ app.post("/api/info", async (req, res) => {
 app.post("/api/download", async (req, res) => {
   const { url } = req.body;
 
-  const videoId = url.split("v=")[1];
+  const getVideoId = (url) => {
+    try {
+      if (url.includes("youtu.be")) {
+        return url.split("youtu.be/")[1];
+      }
+      return url.split("v=")[1];
+    } catch {
+      return null;
+    }
+  };
+
+  const videoId = getVideoId(url);
+
+  if (!videoId) {
+    return res.status(400).send("Invalid URL");
+  }
 
   res.json({
     downloadUrl: `https://yt-api.p.rapidapi.com/dl?id=${videoId}`
