@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
-const youtubedl = require("youtube-dl-exec").raw;
+const youtubedl = require("youtube-dl-exec");
 
 const app = express();
 app.use(cors());
