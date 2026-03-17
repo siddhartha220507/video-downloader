@@ -1,96 +1,83 @@
 const express = require("express");
 const cors = require("cors");
-const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
+const youtubedl = require("yt-dlp-exec");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 /* STEP A: GET VIDEO INFO */
-app.post("/api/info", (req, res) => {
+app.post("/api/info", async (req, res) => {
     const { url } = req.body;
-
-    const ytdlp = spawn("yt-dlp", ["-j", url]);
-
-    let data = "";
-
-    ytdlp.stdout.on("data", chunk => data += chunk);
-
-    ytdlp.on("close", () => {
-        try {
-            const json = JSON.parse(data);
-
-            res.json({
-                title: json.title,
-                thumbnail: json.thumbnail
-            });
-        } catch {
-            res.status(500).send("Error fetching info");
-        }
-    });
+    try {
+        const info = await youtubedl(url, {
+            dumpJson: true,
+            noCheckCertificates: true,
+            noWarnings: true,
+            preferFreeFormats: true
+        });
+        
+        res.json({
+            title: info.title,
+            thumbnail: info.thumbnail
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Error fetching info");
+    }
 });
 
 /* STEP B: DOWNLOAD */
-app.post("/api/download", (req, res) => {
+app.post("/api/download", async (req, res) => {
     const { url, type } = req.body;
-
     const unique = Date.now();
-    let args;
+    
+    let options = {};
+    let outputFilename = "";
 
     if (type === "mp3") {
-        args = [
-            "-x",
-            "--audio-format", "mp3",
-            "--audio-quality", "192K",
-            "-o", `audio_${unique}.%(ext)s`,
-            url
-        ];
+        outputFilename = `audio_${unique}.mp3`;
+        options = {
+            extractAudio: true,
+            audioFormat: "mp3",
+            audioQuality: "192K",
+            output: outputFilename
+        };
+    } else if (type === "mp4") {
+        outputFilename = `video_${unique}.mp4`;
+        options = {
+            format: "best[ext=mp4]",
+            output: outputFilename
+        };
+    } else if (type === "video-only") {
+        outputFilename = `video_only_${unique}.mp4`;
+        options = {
+            format: "bv*",
+            mergeOutputFormat: "mp4",
+            output: outputFilename
+        };
     }
 
-    if (type === "mp4") {
-        args = [
-            "-f", "best[ext=mp4]",
-            "-o", `video_${unique}.%(ext)s`,
-            url
-        ];
-    }
-
-    if (type === "video-only") {
-        args = [
-            "-f", "bv*",
-            "--merge-output-format", "mp4",
-            "-o", `video_only_${unique}.mp4`,
-            url
-        ];
-    }
-
-    const ytdlp = spawn("yt-dlp", args);
-
-    ytdlp.on("close", (code) => {
-        if (code !== 0) {
-            return res.status(500).send("Download failed");
+    try {
+        await youtubedl(url, options);
+        
+        const filePath = path.join(__dirname, outputFilename);
+        
+        if (fs.existsSync(filePath)) {
+            res.download(filePath, outputFilename, (err) => {
+                if (!err) {
+                    fs.unlinkSync(filePath); // delete after download
+                }
+            });
+        } else {
+            res.status(500).send("Download failed: File not found");
         }
-
-        const files = fs.readdirSync(__dirname);
-
-        const file = files.find(f =>
-            f.endsWith(".mp4") ||
-            f.endsWith(".mp3") ||
-            f.endsWith(".webm")
-        );
-
-        if (!file) {
-            return res.status(500).send("Download failed");
-        }
-
-        const filePath = path.join(__dirname, file);
-
-        res.download(filePath, () => {
-            fs.unlinkSync(filePath);
-        });
-    });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Download failed");
+    }
 });
 
 const PORT = process.env.PORT || 5000;
