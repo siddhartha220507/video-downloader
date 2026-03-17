@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
-const youtubedl = require("yt-dlp-exec");
+const youtubedl = require("youtube-dl-exec");
 
 const app = express();
 app.use(cors());
@@ -13,7 +13,7 @@ app.post("/api/info", async (req, res) => {
     const { url } = req.body;
     try {
         const info = await youtubedl(url, {
-            dumpJson: true,
+            dumpSingleJson: true,
             noCheckCertificates: true,
             noWarnings: true,
             preferFreeFormats: true
