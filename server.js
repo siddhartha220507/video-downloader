@@ -49,16 +49,24 @@ app.post("/api/info", async (req, res) => {
 
 // STEP 2: DOWNLOAD (direct link return)
 app.post("/api/download", async (req, res) => {
-  const { url } = req.body;
+  const { url, type } = req.body;
 
   const getVideoId = (url) => {
-    if (url.includes("youtu.be")) {
-      return url.split("youtu.be/")[1];
+    try {
+      if (url.includes("youtu.be")) {
+        return url.split("youtu.be/")[1];
+      }
+      return url.split("v=")[1];
+    } catch {
+      return null;
     }
-    return url.split("v=")[1];
   };
 
   const videoId = getVideoId(url);
+
+  if (!videoId) {
+    return res.status(400).send("Invalid URL");
+  }
 
   try {
     const response = await fetch(`https://yt-api.p.rapidapi.com/dl?id=${videoId}`, {
@@ -70,14 +78,28 @@ app.post("/api/download", async (req, res) => {
 
     const data = await response.json();
 
-    // pick first format
-    const downloadLink = data.formats?.[0]?.url;
+    let selected;
 
-    if (!downloadLink) {
-      return res.status(500).send("No download link found");
+    if (type === "mp3") {
+      // audio only, optionally sorting for best bitrate
+      selected = data.formats
+        ?.filter(f => f.mimeType?.includes("audio"))
+        ?.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+    } 
+    else if (type === "video-only") {
+      // video without audio
+      selected = data.formats?.find(f => f.mimeType?.includes("video") && !f.mimeType?.includes("audio"));
+    } 
+    else {
+      // mp4 (video + audio)
+      selected = data.formats?.find(f => f.mimeType?.includes("video") && f.mimeType?.includes("audio"));
     }
 
-    res.json({ downloadUrl: downloadLink });
+    if (!selected) {
+      return res.status(500).send("No format found for the requested type");
+    }
+
+    res.json({ downloadUrl: selected.url });
 
   } catch (err) {
     console.error(err);
