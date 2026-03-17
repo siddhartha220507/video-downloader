@@ -52,25 +52,37 @@ app.post("/api/download", async (req, res) => {
   const { url } = req.body;
 
   const getVideoId = (url) => {
-    try {
-      if (url.includes("youtu.be")) {
-        return url.split("youtu.be/")[1];
-      }
-      return url.split("v=")[1];
-    } catch {
-      return null;
+    if (url.includes("youtu.be")) {
+      return url.split("youtu.be/")[1];
     }
+    return url.split("v=")[1];
   };
 
   const videoId = getVideoId(url);
 
-  if (!videoId) {
-    return res.status(400).send("Invalid URL");
-  }
+  try {
+    const response = await fetch(`https://yt-api.p.rapidapi.com/dl?id=${videoId}`, {
+      headers: {
+        "X-RapidAPI-Key": "6f0a2c61d5msh8b5b913e276ad91p1bc69djsn6b90126b8ef8",
+        "X-RapidAPI-Host": "yt-api.p.rapidapi.com"
+      }
+    });
 
-  res.json({
-    downloadUrl: `https://yt-api.p.rapidapi.com/dl?id=${videoId}`
-  });
+    const data = await response.json();
+
+    // pick first format
+    const downloadLink = data.formats?.[0]?.url;
+
+    if (!downloadLink) {
+      return res.status(500).send("No download link found");
+    }
+
+    res.json({ downloadUrl: downloadLink });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Download failed");
+  }
 });
 
 const PORT = process.env.PORT || 5000;
