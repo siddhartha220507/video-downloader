@@ -84,7 +84,7 @@ app.post("/api/info", async (req, res) => {
   }
 });
 
-// STEP 2: DOWNLOAD MP3 (2-Step API: Init → Poll → Download)
+// STEP 2: DOWNLOAD MP3 (Direct API: youtube-mp36)
 const downloadHandler = async (req, res) => {
   const url = req.body?.url || req.query?.url;
 
@@ -106,63 +106,42 @@ const downloadHandler = async (req, res) => {
   }
 
   try {
-    // STEP 1: INIT CONVERSION
-    const initRes = await fetch(
-      `https://youtube-mp4-mp3-downloader.p.rapidapi.com/api/v1/init?id=${videoId}`,
+    console.log("🎯 Fetching MP3 for video ID:", videoId);
+
+    // Direct API call to youtube-mp36
+    const apiRes = await fetch(
+      `https://youtube-mp36.p.rapidapi.com/dl?id=${videoId}`,
       {
         headers: {
+          "Content-Type": "application/json",
           "x-rapidapi-key": "6f0a2c61d5msh8b5b913e276ad91p1bc69djsn6b90126b8ef8",
-          "x-rapidapi-host": "youtube-mp4-mp3-downloader.p.rapidapi.com"
+          "x-rapidapi-host": "youtube-mp36.p.rapidapi.com"
         }
       }
     );
 
-    const initData = await initRes.json();
-    const conversionId = initData.id;
+    const data = await apiRes.json();
 
-    if (!conversionId) {
-      return res.status(500).send("Failed to start conversion");
+    console.log("📥 API Response:", data);
+
+    if (!data || !data.link) {
+      return res.status(500).send("Download link not found");
     }
 
-    console.log("🆔 Conversion ID:", conversionId);
+    // Fetch the actual MP3 file
+    const fileRes = await fetch(data.link);
 
-    // STEP 2: POLLING (wait until ready)
-    let downloadUrl = null;
-
-    for (let i = 0; i < 10; i++) {
-      const progressRes = await fetch(
-        `https://youtube-mp4-mp3-downloader.p.rapidapi.com/api/v1/progress?id=${conversionId}`,
-        {
-          headers: {
-            "x-rapidapi-key": "6f0a2c61d5msh8b5b913e276ad91p1bc69djsn6b90126b8ef8",
-            "x-rapidapi-host": "youtube-mp4-mp3-downloader.p.rapidapi.com"
-          }
-        }
-      );
-
-      const progressData = await progressRes.json();
-
-      console.log(`⏳ Attempt ${i + 1}:`, progressData);
-
-      if (progressData.status === "finished") {
-        downloadUrl = progressData.download_url;
-        break;
-      }
-
-      // Wait 3 seconds before next check
-      await new Promise(r => setTimeout(r, 3000));
+    if (!fileRes.ok) {
+      return res.status(500).send("Failed to fetch MP3 file");
     }
 
-    if (!downloadUrl) {
-      return res.status(500).send("Still processing, try again");
-    }
-
-    // STEP 3: FORCE DOWNLOAD
-    const fileRes = await fetch(downloadUrl);
-
+    // Set headers for force download
     res.setHeader("Content-Disposition", `attachment; filename="${videoId}.mp3"`);
     res.setHeader("Content-Type", "audio/mpeg");
 
+    console.log("⬇️ Streaming MP3...");
+
+    // Pipe the file stream directly to response
     fileRes.body.pipe(res);
 
   } catch (err) {
