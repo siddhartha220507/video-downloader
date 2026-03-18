@@ -100,26 +100,36 @@ app.post("/api/info", async (req, res) => {
 
 // STEP 2: DOWNLOAD MP3 (Direct Redirect - No Streaming)
 const downloadHandler = async (req, res) => {
-  const url = req.body?.url || req.query?.url;
-
-  const getVideoId = (url) => {
-    try {
-      if (url.includes("youtu.be")) {
-        return url.split("youtu.be/")[1];
-      }
-      return url.split("v=")[1];
-    } catch {
-      return null;
-    }
-  };
-
-  const videoId = getVideoId(url);
-
-  if (!videoId) {
-    return res.status(400).send("Invalid URL");
-  }
-
   try {
+    const url = req.body?.url || req.query?.url;
+
+    console.log("📥 Download request received");
+    console.log("🔍 URL:", url?.substring(0, 50));
+
+    if (!url) {
+      console.error("❌ No URL provided");
+      return res.status(400).send("URL is required");
+    }
+
+    const getVideoId = (url) => {
+      try {
+        if (url.includes("youtu.be")) {
+          return url.split("youtu.be/")[1]?.split("?")[0];
+        }
+        const match = url.match(/v=([a-zA-Z0-9_-]+)/);
+        return match ? match[1] : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const videoId = getVideoId(url);
+
+    if (!videoId) {
+      console.error("❌ Invalid video ID from URL:", url);
+      return res.status(400).send("Invalid YouTube URL");
+    }
+
     console.log("🎯 Fetching MP3 for video ID:", videoId);
 
     const apiRes = await fetch(
@@ -132,30 +142,54 @@ const downloadHandler = async (req, res) => {
       }
     );
 
+    if (!apiRes.ok) {
+      console.error("❌ API error:", apiRes.status);
+      return res.status(500).send(`API Error: ${apiRes.status}`);
+    }
+
     const data = await apiRes.json();
 
     console.log("📥 API Response:", data);
 
     if (!data || !data.link) {
-      console.error("❌ No download link:", data);
-      return res.status(500).send("Download link not found");
+      console.error("❌ No download link in response");
+      return res.status(500).send("Could not get download link");
     }
 
-    console.log("🔗 Redirecting to:", data.link.substring(0, 100));
+    console.log("🔗 Redirecting to download...");
 
     // ✅ DIRECT DOWNLOAD REDIRECT
     res.redirect(data.link);
 
   } catch (err) {
-    console.error("❌ Error:", err.message);
-    res.status(500).send("Download failed");
+    console.error("❌ Download Error:", err.message);
+    res.status(500).send(`Error: ${err.message}`);
   }
 };
 
-// Support both GET and POST
+// Support both GET and POST for /api/download
 app.get("/api/download", downloadHandler);
 app.post("/api/download", downloadHandler);
 
+// Catch-all 404 handler
+app.use((req, res) => {
+  console.log(`❌ 404 - Route not found: ${req.method} ${req.path}`);
+  res.status(404).json({ error: "Route not found", path: req.path });
+});
+
+// Error handler middleware
+app.use((err, req, res, next) => {
+  console.error("⚠️ Server Error:", err);
+  res.status(500).json({ error: "Internal server error", message: err.message });
+});
+
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => console.log("🎵 Server running on port", PORT));
+app.listen(PORT, () => {
+  console.log("🎵 Server running on port", PORT);
+  console.log("✅ Routes available:");
+  console.log("   GET  /api/health");
+  console.log("   POST /api/info");
+  console.log("   GET  /api/download?url=..."); 
+  console.log("   POST /api/download (body: {url})");
+});
