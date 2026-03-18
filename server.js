@@ -28,7 +28,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'Backend is running!', timestamp: new Date().toISOString() });
 });
 
-// STEP 1: GET INFO
+// STEP 1: GET INFO (Fetch video title & thumbnail)
 app.post("/api/info", async (req, res) => {
   const { url } = req.body;
 
@@ -50,37 +50,51 @@ app.post("/api/info", async (req, res) => {
   }
 
   try {
-    const response = await fetch(`https://yt-api.p.rapidapi.com/dl?id=${videoId}`, {
+    console.log("📹 Fetching info for video ID:", videoId);
+
+    // Try youtube-mp36 API first for video info
+    const response = await fetch(`https://youtube-mp36.p.rapidapi.com/info?id=${videoId}`, {
       headers: {
-        "X-RapidAPI-Key": "6f0a2c61d5msh8b5b913e276ad91p1bc69djsn6b90126b8ef8",
-        "X-RapidAPI-Host": "yt-api.p.rapidapi.com"
+        "x-rapidapi-key": "6f0a2c61d5msh8b5b913e276ad91p1bc69djsn6b90126b8ef8",
+        "x-rapidapi-host": "youtube-mp36.p.rapidapi.com"
       }
     });
 
     const data = await response.json();
 
-    // Get thumbnail URL with proper fallbacks
-    let thumbnailUrl = "https://via.placeholder.com/300";
+    console.log("📥 Info Response:", data);
+
+    // Extract thumbnail from various possible locations
+    let thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
     
-    if (data.thumbnail) {
-      // If thumbnail is an array
-      if (Array.isArray(data.thumbnail) && data.thumbnail[0]?.url) {
-        thumbnailUrl = data.thumbnail[0].url;
-      }
-      // If thumbnail is a string URL
-      else if (typeof data.thumbnail === 'string' && data.thumbnail.startsWith('http')) {
-        thumbnailUrl = data.thumbnail;
-      }
+    if (data?.thumbnail) {
+      thumbnailUrl = data.thumbnail;
+    } else if (data?.image) {
+      thumbnailUrl = data.image;
     }
 
     res.json({
-      title: data.title || "No title",
-      thumbnail: thumbnailUrl
+      title: data?.title || data?.name || "YouTube Video",
+      thumbnail: thumbnailUrl,
+      videoDetails: {
+        title: data?.title || data?.name,
+        thumbnail: thumbnailUrl
+      }
     });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error fetching info");
+    console.error("❌ Info Error:", err.message);
+    
+    // Fallback: Return default with YouTube thumbnail
+    const videoId = getVideoId(url);
+    res.json({
+      title: "YouTube Video",
+      thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+      videoDetails: {
+        title: "YouTube Video",
+        thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+      }
+    });
   }
 });
 
