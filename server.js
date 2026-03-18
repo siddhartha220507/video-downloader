@@ -3,6 +3,9 @@ const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
 
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
+const RAPIDAPI_HOST = "youtube-mp36.p.rapidapi.com";
+
 const app = express();
 
 // Advanced CORS Configuration - Allow all origins
@@ -55,8 +58,8 @@ app.post("/api/info", async (req, res) => {
     // Try youtube-mp36 API first for video info
     const response = await fetch(`https://youtube-mp36.p.rapidapi.com/info?id=${videoId}`, {
       headers: {
-        "x-rapidapi-key": "6f0a2c61d5msh8b5b913e276ad91p1bc69djsn6b90126b8ef8",
-        "x-rapidapi-host": "youtube-mp36.p.rapidapi.com"
+        "x-rapidapi-key": RAPIDAPI_KEY,
+        "x-rapidapi-host": RAPIDAPI_HOST
       }
     });
 
@@ -136,8 +139,8 @@ const downloadHandler = async (req, res) => {
       `https://youtube-mp36.p.rapidapi.com/dl?id=${videoId}`,
       {
         headers: {
-          "x-rapidapi-key": "6f0a2c61d5msh8b5b913e276ad91p1bc69djsn6b90126b8ef8",
-          "x-rapidapi-host": "youtube-mp36.p.rapidapi.com"
+          "x-rapidapi-key": RAPIDAPI_KEY,
+          "x-rapidapi-host": RAPIDAPI_HOST
         }
       }
     );
