@@ -131,7 +131,17 @@ app.post("/api/download", async (req, res) => {
       return res.status(500).send("No format found for the requested type");
     }
 
-    res.json({ downloadUrl: selected.url });
+    // Generate filename with title and format
+    let fileExtension = type === "mp3" ? "mp3" : "mp4";
+    let filename = `${data.title || "download"}.${fileExtension}`;
+    // Clean filename - remove invalid characters
+    filename = filename.replace(/[<>:"|?*\\\/ ]/g, "_").substring(0, 200);
+
+    res.json({ 
+      downloadUrl: selected.url,
+      title: data.title || "Video",
+      filename: filename
+    });
 
   } catch (err) {
     console.error(err);
