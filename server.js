@@ -36,9 +36,23 @@ app.post("/api/info", async (req, res) => {
 
     const data = await response.json();
 
+    // Get thumbnail URL with proper fallbacks
+    let thumbnailUrl = "https://via.placeholder.com/300";
+    
+    if (data.thumbnail) {
+      // If thumbnail is an array
+      if (Array.isArray(data.thumbnail) && data.thumbnail[0]?.url) {
+        thumbnailUrl = data.thumbnail[0].url;
+      }
+      // If thumbnail is a string URL
+      else if (typeof data.thumbnail === 'string' && data.thumbnail.startsWith('http')) {
+        thumbnailUrl = data.thumbnail;
+      }
+    }
+
     res.json({
       title: data.title || "No title",
-      thumbnail: data.thumbnail?.[0]?.url || "https://via.placeholder.com/300"
+      thumbnail: thumbnailUrl
     });
 
   } catch (err) {
