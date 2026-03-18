@@ -78,6 +78,8 @@ app.post("/api/download", async (req, res) => {
 
     const data = await response.json();
 
+    console.log("📥 API Response - Formats Available:", data.formats?.length || 0);
+
     let selected;
 
     if (type === "mp3") {
@@ -85,17 +87,33 @@ app.post("/api/download", async (req, res) => {
       selected = data.formats
         ?.filter(f => f.mimeType?.includes("audio"))
         ?.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+      console.log("🎵 Selected MP3:", selected?.mimeType);
     } 
     else if (type === "video-only") {
       // video without audio
       selected = data.formats?.find(f => f.mimeType?.includes("video") && !f.mimeType?.includes("audio"));
+      
+      // 🔥 fallback if pure video not found
+      if (!selected) {
+        console.log("⚠️ No pure video found, trying with audio...");
+        selected = data.formats?.find(f => f.mimeType?.includes("video"));
+      }
+      console.log("🎥 Selected Video-Only:", selected?.mimeType);
     } 
     else {
       // mp4 (video + audio)
       selected = data.formats?.find(f => f.mimeType?.includes("video") && f.mimeType?.includes("audio"));
+      
+      // 🔥 fallback to any video if video+audio not found
+      if (!selected) {
+        console.log("⚠️ No video+audio found, trying any video...");
+        selected = data.formats?.find(f => f.mimeType?.includes("video"));
+      }
+      console.log("🎬 Selected MP4:", selected?.mimeType);
     }
 
     if (!selected) {
+      console.error("❌ No format found. Available formats:", data.formats?.map(f => f.mimeType));
       return res.status(500).send("No format found for the requested type");
     }
 
