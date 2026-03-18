@@ -84,7 +84,7 @@ app.post("/api/info", async (req, res) => {
   }
 });
 
-// STEP 2: DOWNLOAD MP3 (Streaming via Backend Proxy) - GET & POST
+// STEP 2: DOWNLOAD MP3 (2-Step API: Init → Poll → Download)
 const downloadHandler = async (req, res) => {
   const url = req.body?.url || req.query?.url;
 
@@ -102,73 +102,72 @@ const downloadHandler = async (req, res) => {
   const videoId = getVideoId(url);
 
   if (!videoId) {
-    return res.status(400).send("Invalid YouTube URL");
+    return res.status(400).send("Invalid URL");
   }
 
   try {
-    let downloadLink = null;
-
-    // Retry system: Try max 5 times (3 sec between attempts)
-    for (let i = 0; i < 5; i++) {
-      try {
-        const response = await fetch(
-          `https://youtube-mp3-audio-video-downloader.p.rapidapi.com/get_mp3_download_link/${videoId}?quality=low&wait_until_the_file_is_ready=true`,
-          {
-            headers: {
-              "x-rapidapi-key": "6f0a2c61d5msh8b5b913e276ad91p1bc69djsn6b90126b8ef8",
-              "x-rapidapi-host": "youtube-mp3-audio-video-downloader.p.rapidapi.com"
-            }
-          }
-        );
-
-        const data = await response.json();
-
-        console.log(`⏳ Attempt ${i + 1}:`, data);
-
-        if (data?.link) {
-          downloadLink = data.link;
-          console.log(`✅ Got download link on attempt ${i + 1}`);
-          break;
-        }
-
-        // Wait 3 seconds before retry
-        if (i < 4) {
-          console.log(`⏸️ Waiting 3 seconds before retry...`);
-          await new Promise(resolve => setTimeout(resolve, 3000));
-        }
-
-      } catch (retryErr) {
-        console.error(`❌ Attempt ${i + 1} failed:`, retryErr.message);
-        if (i < 4) {
-          await new Promise(resolve => setTimeout(resolve, 3000));
+    // STEP 1: INIT CONVERSION
+    const initRes = await fetch(
+      `https://youtube-mp4-mp3-downloader.p.rapidapi.com/api/v1/init?id=${videoId}`,
+      {
+        headers: {
+          "x-rapidapi-key": "6f0a2c61d5msh8b5b913e276ad91p1bc69djsn6b90126b8ef8",
+          "x-rapidapi-host": "youtube-mp4-mp3-downloader.p.rapidapi.com"
         }
       }
+    );
+
+    const initData = await initRes.json();
+    const conversionId = initData.id;
+
+    if (!conversionId) {
+      return res.status(500).send("Failed to start conversion");
     }
 
-    if (!downloadLink) {
-      return res.status(500).send("❌ MP3 still processing, try again in a moment");
+    console.log("🆔 Conversion ID:", conversionId);
+
+    // STEP 2: POLLING (wait until ready)
+    let downloadUrl = null;
+
+    for (let i = 0; i < 10; i++) {
+      const progressRes = await fetch(
+        `https://youtube-mp4-mp3-downloader.p.rapidapi.com/api/v1/progress?id=${conversionId}`,
+        {
+          headers: {
+            "x-rapidapi-key": "6f0a2c61d5msh8b5b913e276ad91p1bc69djsn6b90126b8ef8",
+            "x-rapidapi-host": "youtube-mp4-mp3-downloader.p.rapidapi.com"
+          }
+        }
+      );
+
+      const progressData = await progressRes.json();
+
+      console.log(`⏳ Attempt ${i + 1}:`, progressData);
+
+      if (progressData.status === "finished") {
+        downloadUrl = progressData.download_url;
+        break;
+      }
+
+      // Wait 3 seconds before next check
+      await new Promise(r => setTimeout(r, 3000));
     }
 
-    // Fetch the actual MP3 file
-    const fileResponse = await fetch(downloadLink);
-    
-    if (!fileResponse.ok) {
-      return res.status(500).send("Failed to fetch MP3");
+    if (!downloadUrl) {
+      return res.status(500).send("Still processing, try again");
     }
 
-    // Set headers for force download
+    // STEP 3: FORCE DOWNLOAD
+    const fileRes = await fetch(downloadUrl);
+
     res.setHeader("Content-Disposition", `attachment; filename="${videoId}.mp3"`);
     res.setHeader("Content-Type", "audio/mpeg");
-    res.setHeader("Cache-Control", "no-cache");
 
-    console.log("⬇️ Streaming MP3...");
-
-    // Pipe the file stream directly to response
-    fileResponse.body.pipe(res);
+    fileRes.body.pipe(res);
 
   } catch (err) {
     console.error("❌ Error:", err.message);
-    res.status(500).send("Download error");
+    res.status(500).send("Download failed");
   }
 };
 
