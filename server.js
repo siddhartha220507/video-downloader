@@ -161,8 +161,10 @@ const downloadHandler = async (req, res) => {
 
     console.log("🔗 Redirecting to download...");
 
-    // ✅ DIRECT DOWNLOAD REDIRECT
-    res.redirect(data.link);
+    console.log("🔗 Sending download link to frontend...");
+
+    // ✅ RETURN JSON INSTEAD OF REDIRECT
+    res.json({ link: data.link });
 
   } catch (err) {
     console.error("❌ Download Error:", err.message);
