@@ -122,17 +122,28 @@ const downloadHandler = async (req, res) => {
 
     const data = await apiRes.json();
 
-    console.log("📥 API Response:", data);
+    console.log("📥 API Response:", JSON.stringify(data).substring(0, 200));
 
     if (!data || !data.link) {
+      console.error("❌ No download link in response:", data);
       return res.status(500).send("Download link not found");
     }
 
-    // Fetch the actual MP3 file
-    const fileRes = await fetch(data.link);
+    console.log("🔗 Got MP3 link:", data.link.substring(0, 100));
+
+    // Fetch the actual MP3 file with proper headers
+    const fileRes = await fetch(data.link, {
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+
+    console.log("📊 File fetch status:", fileRes.status, fileRes.statusText);
 
     if (!fileRes.ok) {
-      return res.status(500).send("Failed to fetch MP3 file");
+      console.error("❌ File fetch failed - Status:", fileRes.status);
+      return res.status(500).send(`Failed to fetch MP3 file - Status: ${fileRes.status}`);
     }
 
     // Set headers for force download
@@ -146,7 +157,8 @@ const downloadHandler = async (req, res) => {
 
   } catch (err) {
     console.error("❌ Error:", err.message);
-    res.status(500).send("Download failed");
+    console.error("Stack:", err.stack);
+    res.status(500).send(`Download failed: ${err.message}`);
   }
 };
 
