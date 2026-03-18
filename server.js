@@ -106,26 +106,51 @@ const downloadHandler = async (req, res) => {
   }
 
   try {
-    const response = await fetch(
-      `https://youtube-mp3-audio-video-downloader.p.rapidapi.com/get_mp3_download_link/${videoId}?quality=low&wait_until_the_file_is_ready=true`,
-      {
-        headers: {
-          "x-rapidapi-key": "6f0a2c61d5msh8b5b913e276ad91p1bc69djsn6b90126b8ef8",
-          "x-rapidapi-host": "youtube-mp3-audio-video-downloader.p.rapidapi.com"
+    let downloadLink = null;
+
+    // Retry system: Try max 5 times (3 sec between attempts)
+    for (let i = 0; i < 5; i++) {
+      try {
+        const response = await fetch(
+          `https://youtube-mp3-audio-video-downloader.p.rapidapi.com/get_mp3_download_link/${videoId}?quality=low&wait_until_the_file_is_ready=true`,
+          {
+            headers: {
+              "x-rapidapi-key": "6f0a2c61d5msh8b5b913e276ad91p1bc69djsn6b90126b8ef8",
+              "x-rapidapi-host": "youtube-mp3-audio-video-downloader.p.rapidapi.com"
+            }
+          }
+        );
+
+        const data = await response.json();
+
+        console.log(`⏳ Attempt ${i + 1}:`, data);
+
+        if (data?.link) {
+          downloadLink = data.link;
+          console.log(`✅ Got download link on attempt ${i + 1}`);
+          break;
+        }
+
+        // Wait 3 seconds before retry
+        if (i < 4) {
+          console.log(`⏸️ Waiting 3 seconds before retry...`);
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+
+      } catch (retryErr) {
+        console.error(`❌ Attempt ${i + 1} failed:`, retryErr.message);
+        if (i < 4) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
         }
       }
-    );
+    }
 
-    const data = await response.json();
-
-    console.log("📥 API Response:", data);
-
-    if (!data || !data.link) {
-      return res.status(500).send("MP3 not ready");
+    if (!downloadLink) {
+      return res.status(500).send("❌ MP3 still processing, try again in a moment");
     }
 
     // Fetch the actual MP3 file
-    const fileResponse = await fetch(data.link);
+    const fileResponse = await fetch(downloadLink);
     
     if (!fileResponse.ok) {
       return res.status(500).send("Failed to fetch MP3");
