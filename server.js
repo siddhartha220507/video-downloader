@@ -98,7 +98,7 @@ app.post("/api/info", async (req, res) => {
   }
 });
 
-// STEP 2: DOWNLOAD MP3 (Direct API: youtube-mp36)
+// STEP 2: DOWNLOAD MP3 (Direct Redirect - No Streaming)
 const downloadHandler = async (req, res) => {
   const url = req.body?.url || req.query?.url;
 
@@ -122,12 +122,10 @@ const downloadHandler = async (req, res) => {
   try {
     console.log("🎯 Fetching MP3 for video ID:", videoId);
 
-    // Direct API call to youtube-mp36
     const apiRes = await fetch(
       `https://youtube-mp36.p.rapidapi.com/dl?id=${videoId}`,
       {
         headers: {
-          "Content-Type": "application/json",
           "x-rapidapi-key": "6f0a2c61d5msh8b5b913e276ad91p1bc69djsn6b90126b8ef8",
           "x-rapidapi-host": "youtube-mp36.p.rapidapi.com"
         }
@@ -136,43 +134,21 @@ const downloadHandler = async (req, res) => {
 
     const data = await apiRes.json();
 
-    console.log("📥 API Response:", JSON.stringify(data).substring(0, 200));
+    console.log("📥 API Response:", data);
 
     if (!data || !data.link) {
-      console.error("❌ No download link in response:", data);
+      console.error("❌ No download link:", data);
       return res.status(500).send("Download link not found");
     }
 
-    console.log("🔗 Got MP3 link:", data.link.substring(0, 100));
+    console.log("🔗 Redirecting to:", data.link.substring(0, 100));
 
-    // Fetch the actual MP3 file with proper headers
-    const fileRes = await fetch(data.link, {
-      redirect: 'follow',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
-    });
-
-    console.log("📊 File fetch status:", fileRes.status, fileRes.statusText);
-
-    if (!fileRes.ok) {
-      console.error("❌ File fetch failed - Status:", fileRes.status);
-      return res.status(500).send(`Failed to fetch MP3 file - Status: ${fileRes.status}`);
-    }
-
-    // Set headers for force download
-    res.setHeader("Content-Disposition", `attachment; filename="${videoId}.mp3"`);
-    res.setHeader("Content-Type", "audio/mpeg");
-
-    console.log("⬇️ Streaming MP3...");
-
-    // Pipe the file stream directly to response
-    fileRes.body.pipe(res);
+    // ✅ DIRECT DOWNLOAD REDIRECT
+    res.redirect(data.link);
 
   } catch (err) {
     console.error("❌ Error:", err.message);
-    console.error("Stack:", err.stack);
-    res.status(500).send(`Download failed: ${err.message}`);
+    res.status(500).send("Download failed");
   }
 };
 
