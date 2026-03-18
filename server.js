@@ -1,5 +1,7 @@
 const express = require("express");
 const cors = require("cors");
+const fs = require("fs");
+const path = require("path");
 
 const app = express();
 
@@ -82,9 +84,9 @@ app.post("/api/info", async (req, res) => {
   }
 });
 
-// STEP 2: DOWNLOAD (direct link return)
-app.post("/api/download", async (req, res) => {
-  const { url, type } = req.body;
+// STEP 2: DOWNLOAD MP3 (Streaming via Backend Proxy) - GET & POST
+const downloadHandler = async (req, res) => {
+  const url = req.body?.url || req.query?.url;
 
   const getVideoId = (url) => {
     try {
@@ -100,75 +102,55 @@ app.post("/api/download", async (req, res) => {
   const videoId = getVideoId(url);
 
   if (!videoId) {
-    return res.status(400).send("Invalid URL");
+    return res.status(400).send("Invalid YouTube URL");
   }
 
   try {
-    const response = await fetch(`https://yt-api.p.rapidapi.com/dl?id=${videoId}`, {
-      headers: {
-        "X-RapidAPI-Key": "6f0a2c61d5msh8b5b913e276ad91p1bc69djsn6b90126b8ef8",
-        "X-RapidAPI-Host": "yt-api.p.rapidapi.com"
+    const response = await fetch(
+      `https://youtube-mp3-audio-video-downloader.p.rapidapi.com/get_mp3_download_link/${videoId}?quality=low&wait_until_the_file_is_ready=true`,
+      {
+        headers: {
+          "x-rapidapi-key": "6f0a2c61d5msh8b5b913e276ad91p1bc69djsn6b90126b8ef8",
+          "x-rapidapi-host": "youtube-mp3-audio-video-downloader.p.rapidapi.com"
+        }
       }
-    });
+    );
 
     const data = await response.json();
 
-    console.log("📥 API Response - Formats Available:", data.formats?.length || 0);
+    console.log("📥 API Response:", data);
 
-    let selected;
-
-    if (type === "mp3") {
-      // audio only, optionally sorting for best bitrate
-      selected = data.formats
-        ?.filter(f => f.mimeType?.includes("audio"))
-        ?.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
-      console.log("🎵 Selected MP3:", selected?.mimeType);
-    } 
-    else if (type === "video-only") {
-      // video without audio
-      selected = data.formats?.find(f => f.mimeType?.includes("video") && !f.mimeType?.includes("audio"));
-      
-      // 🔥 fallback if pure video not found
-      if (!selected) {
-        console.log("⚠️ No pure video found, trying with audio...");
-        selected = data.formats?.find(f => f.mimeType?.includes("video"));
-      }
-      console.log("🎥 Selected Video-Only:", selected?.mimeType);
-    } 
-    else {
-      // mp4 (video + audio)
-      selected = data.formats?.find(f => f.mimeType?.includes("video") && f.mimeType?.includes("audio"));
-      
-      // 🔥 fallback to any video if video+audio not found
-      if (!selected) {
-        console.log("⚠️ No video+audio found, trying any video...");
-        selected = data.formats?.find(f => f.mimeType?.includes("video"));
-      }
-      console.log("🎬 Selected MP4:", selected?.mimeType);
+    if (!data || !data.link) {
+      return res.status(500).send("MP3 not ready");
     }
 
-    if (!selected) {
-      console.error("❌ No format found. Available formats:", data.formats?.map(f => f.mimeType));
-      return res.status(500).send("No format found for the requested type");
+    // Fetch the actual MP3 file
+    const fileResponse = await fetch(data.link);
+    
+    if (!fileResponse.ok) {
+      return res.status(500).send("Failed to fetch MP3");
     }
 
-    // Generate filename with title and format
-    let fileExtension = type === "mp3" ? "mp3" : "mp4";
-    let filename = `${data.title || "download"}.${fileExtension}`;
-    // Clean filename - remove invalid characters
-    filename = filename.replace(/[<>:"|?*\\\/ ]/g, "_").substring(0, 200);
+    // Set headers for force download
+    res.setHeader("Content-Disposition", `attachment; filename="${videoId}.mp3"`);
+    res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Cache-Control", "no-cache");
 
-    res.json({ 
-      downloadUrl: selected.url,
-      title: data.title || "Video",
-      filename: filename
-    });
+    console.log("⬇️ Streaming MP3...");
+
+    // Pipe the file stream directly to response
+    fileResponse.body.pipe(res);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Download failed");
+    console.error("❌ Error:", err.message);
+    res.status(500).send("Download error");
   }
-});
+};
+
+// Support both GET and POST
+app.get("/api/download", downloadHandler);
+app.post("/api/download", downloadHandler);
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log("Server running"));
+
+app.listen(PORT, () => console.log("🎵 Server running on port", PORT));
