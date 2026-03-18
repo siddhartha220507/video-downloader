@@ -56,7 +56,7 @@ app.post("/api/info", async (req, res) => {
     console.log("📹 Fetching info for video ID:", videoId);
 
     // Try youtube-mp36 API first for video info
-    const response = await fetch(`https://youtube-mp36.p.rapidapi.com/info?id=${videoId}`, {
+    const response = await fetch(`https://youtube-mp36.p.rapidapi.com/dl?id=${videoId}`, {
       headers: {
         "x-rapidapi-key": RAPIDAPI_KEY,
         "x-rapidapi-host": RAPIDAPI_HOST
