@@ -171,7 +171,18 @@ const downloadHandler = async (req, res) => {
 app.get("/api/download", downloadHandler);
 app.post("/api/download", downloadHandler);
 
-// Catch-all 404 handler
+// Serve frontend static files
+app.use(express.static(path.join(__dirname, '../frontend/build')));
+
+// Catch-all route to serve the React app (for client-side routing)
+app.use((req, res, next) => {
+  if (req.method === 'GET' && !req.path.startsWith('/api/')) {
+    return res.sendFile(path.join(__dirname, '../frontend/build', 'index.html'));
+  }
+  next();
+});
+
+// Catch-all 404 handler for API routes or unhandled methods
 app.use((req, res) => {
   console.log(`❌ 404 - Route not found: ${req.method} ${req.path}`);
   res.status(404).json({ error: "Route not found", path: req.path });
